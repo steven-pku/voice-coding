@@ -17,7 +17,7 @@ The helper makes no model or network calls and cannot create, continue, stop, or
 
 Every modifying command after initialization requires the expected board revision. This rejects a stale update; it does not establish exclusive control of every native task or prevent another program from changing files.
 
-Write scopes use normalized absolute file or directory paths on the machine running the helper. Conflict checks conservatively compare all registered paths, including held tasks, regardless of native host ID. Remote filesystem scopes are not modeled. A read-only task has an empty write scope. These checks are not an operating-system access boundary and cannot detect unregistered writers.
+Write scopes use normalized absolute file or directory paths on the machine running the helper. Conflict checks conservatively compare all registered paths, including held tasks, regardless of native host ID. Remote filesystem scopes are not modeled. Case-only aliases are conservatively treated as overlapping even on case-sensitive filesystems. A single owner may reserve redundant parent/child paths. A read-only task has an empty write scope. These checks are not an operating-system access boundary and cannot detect unregistered writers.
 
 ## Completion, holds, and failure
 
@@ -26,7 +26,9 @@ Write scopes use normalized absolute file or directory paths on the machine runn
 - `close` is a separate controller decision after resolving outstanding work. Do not close an item solely because its worker reported completion.
 - `hold` prohibits further dispatch through this workflow. It does not interrupt a process. If native stopping is unavailable, report `unsupported`; do not imply that recording a hold stopped execution.
 - Resuming a hold requires an explicit user request. Do not infer resumption from elapsed time, a later status query, or recovered tool availability.
-- When creation or delivery has an uncertain outcome, inspect native state before retrying. A retry can otherwise create duplicate work.
+- When creation or delivery has an uncertain outcome, inspect native state before retrying. A retry can otherwise create duplicate work. Binding an already-created identity is permitted during a hold and does not clear it.
+- `cancel` records an explicit user cancellation plus confirmed non-creation or ended execution. Bound tasks need a fresh terminal observation and nonexecution evidence. Running or unknown work keeps its reservation. These are controller assertions, not authenticated approval or termination proofs.
+- Cancellation releases only the local reservation and keeps an immutable `cancelled` record, including any earlier hold. It does not claim successful verification or execute a native action. Closed/cancelled paths are historical lexical records; later filesystem changes do not invalidate them. Active path and pre-closure hash checks remain enforced.
 
 ## Reporting a problem
 

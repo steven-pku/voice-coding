@@ -254,11 +254,152 @@ class BoardContractTests(unittest.TestCase):
         self.assertIsNone(self.task()["hold"])
         self.assertEqual(self.task()["observation"], None)
 
-    def test_held_planned_task_cannot_bind(self):
+    def test_held_planned_task_can_reconcile_identity_without_resuming(self):
         self.register()
         self.call("hold", "alpha", "--reason", "user paused",
                   "--request-ref", "synthetic-pause")
+        hold = self.task()["hold"]
+        self.bind()
+        self.observe(state="running")
+        self.assertEqual(self.task()["hold"], hold)
+        self.bind(native="synthetic-other", reject=True)
+        self.observe()
+        self.call("close", "alpha", "--evidence", "synthetic-close", reject=True)
+        self.verify(self.project / "report.txt", reject=True)
+
+    def test_closed_artifact_layout_change_does_not_block_other_work(self):
+        artifact = self.completed()
+        self.verify(artifact)
+        self.call("close", "alpha", "--evidence", "synthetic-close")
+        original = self.task()
+        self.register("beta", "alpha")
+        self.bind("beta")
+        replacement = artifact.with_name("result-v2.txt")
+        replacement.write_text("Synthetic replacement")
+        artifact.unlink()
+        artifact.symlink_to(replacement.name)
+        self.call("status")
+        self.call("hold", "beta", "--reason", "paused", "--request-ref", "synthetic-pause")
+        self.observe("beta", state="running")
+        self.assertEqual(self.task(), original)
+
+    def test_closed_project_root_can_become_a_symlink_without_breaking_board(self):
+        artifact = self.completed()
+        self.verify(artifact)
+        self.call("close", "alpha", "--evidence", "synthetic-close")
+        original = self.task()
+        moved = self.project.with_name("moved-project")
+        self.project.rename(moved)
+        self.project.symlink_to(moved, target_is_directory=True)
+        self.call("check")
+        self.register("beta", "beta")
+        self.assertEqual(self.task(), original)
+
+    def test_closed_history_still_rejects_lexical_path_escapes(self):
+        artifact = self.completed()
+        self.verify(artifact)
+        self.call("close", "alpha", "--evidence", "synthetic-close")
+        self.rewrite_fixture(lambda b: b["tasks"][0]["verification"]["artifacts"][0].update(
+            path=str(self.root / "outside.txt")))
+        self.call("check", reject=True)
+
+    def cancel(self, key="alpha", outcome="not_created", **kw):
+        return self.call("cancel", key, "--outcome", outcome,
+                         "--request-ref", "synthetic-explicit-cancel-" + key,
+                         "--evidence", "synthetic-confirmed-nonexecution", **kw)
+
+    def test_cancel_confirmed_noncreation_preserves_history_and_releases_scope(self):
+        self.register()
+        self.call("hold", "alpha", "--reason", "paused", "--request-ref", "synthetic-pause")
+        original = self.task()
+        self.cancel()
+        cancelled = self.task()
+        self.assertEqual(cancelled["state"], "cancelled")
+        self.assertEqual(cancelled["hold"], original["hold"])
+        self.assertEqual(cancelled["write_scope"], original["write_scope"])
+        self.assertIsNone(cancelled["verification"])
+        self.register("beta", "alpha")
+        self.assertEqual(self.task(), cancelled)
         self.bind(reject=True)
+        self.cancel(reject=True)
+        self.call("resume", "alpha", "--request-ref", "synthetic-resume", reject=True)
+
+    def test_cancel_confirmed_failed_execution_retains_identity_and_observation(self):
+        self.register()
+        self.bind()
+        self.observe(state="failed")
+        previous = self.task()
+        self.cancel(outcome="stopped")
+        cancelled = self.task()
+        self.assertEqual(cancelled["native"], previous["native"])
+        self.assertEqual(cancelled["observation"], previous["observation"])
+        self.assertIsNone(cancelled["verification"])
+        self.register("beta", "alpha")
+        self.bind("beta", native="synthetic-task-alpha")
+        self.observe(reject=True)
+
+    def test_cancel_preserves_existing_verification_without_claiming_successful_closure(self):
+        artifact = self.completed()
+        self.verify(artifact)
+        verification = self.task()["verification"]
+        self.cancel(outcome="stopped")
+        self.assertEqual(self.task()["verification"], verification)
+        self.assertIsNone(self.task()["closure"])
+
+    def test_cancel_unknown_or_running_execution_keeps_scope(self):
+        self.register()
+        self.bind()
+        for state in ("unknown", "running"):
+            with self.subTest(state=state):
+                self.observe(state=state)
+                self.cancel(outcome="stopped", reject=True)
+                self.cancel(outcome="not_created", reject=True)
+                self.register("beta", "alpha", reject=True)
+
+    def test_cancel_unbound_requires_noncreation_not_a_stop_claim(self):
+        self.register()
+        self.cancel(outcome="stopped", reject=True)
+        self.call("cancel", "alpha", "--outcome", "unknown", "--request-ref", "synthetic-cancel",
+                  "--evidence", "synthetic-unknown", reject=True)
+
+    def test_cancel_rejects_stale_terminal_observation(self):
+        self.register()
+        self.bind()
+        self.observe(state="failed")
+        old = (datetime.now(timezone.utc) - timedelta(minutes=6)).isoformat()
+        self.rewrite_fixture(lambda b: b["tasks"][0]["observation"].update(at=old))
+        self.cancel(outcome="stopped", reject=True)
+
+    def test_cancel_requires_separate_user_request_and_nonempty_evidence(self):
+        self.register()
+        for request, evidence in (("synthetic-request-alpha", "synthetic-evidence"),
+                                  ("synthetic-cancel", ""), ("", "synthetic-evidence")):
+            self.call("cancel", "alpha", "--outcome", "not_created", "--request-ref", request,
+                      "--evidence", evidence, reject=True)
+        self.call("hold", "alpha", "--reason", "paused", "--request-ref", "synthetic-pause")
+        self.call("cancel", "alpha", "--outcome", "not_created", "--request-ref", "synthetic-pause",
+                  "--evidence", "synthetic-evidence", reject=True)
+
+    def test_cancel_record_must_match_terminal_state(self):
+        self.register()
+        self.cancel()
+        self.rewrite_fixture(lambda b: b["tasks"][0].update(state="planned"))
+        self.call("check", reject=True)
+
+    def test_message_subrequests_are_distinct_but_replays_remain_rejected(self):
+        self.register("docs", None, request="synthetic-message#docs")
+        self.register("tests", None, request="synthetic-message#tests")
+        self.register("replay", None, request="synthetic-message#docs", reject=True)
+
+    def test_same_owner_can_reserve_parent_and_child(self):
+        self.call("register", "--key", "alpha", "--title", "Synthetic scope union",
+                  "--project-root", self.project, "--request-ref", "synthetic-request-alpha",
+                  "--write", "src", "--write", "src/result.txt")
+        self.register("beta", "src/result.txt", reject=True)
+
+    def test_case_aliases_are_conservatively_reserved(self):
+        self.register(scope="src")
+        self.register("beta", "SRC/new.py", reject=True)
 
     def test_worker_completion_cannot_close_without_controller_verification(self):
         self.completed()

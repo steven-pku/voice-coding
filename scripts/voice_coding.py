@@ -12,10 +12,11 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 SCHEMA = "voice-coding/board-v1"
 FRESH_SECONDS = 300
-STATES = {"planned", "active", "worker_complete", "verified", "closed"}
+TERMINAL_STATES = {"closed", "cancelled"}
+STATES = {"planned", "active", "worker_complete", "verified"} | TERMINAL_STATES
 NATIVE_STATES = {"running", "completed", "failed", "unknown"}
 
 
@@ -67,7 +68,19 @@ def digest(path):
     return h.hexdigest()
 
 
-def within(root, value):
+def historical_path(value):
+    require(nonempty(value), "historical path required")
+    p = Path(value)
+    require(p.is_absolute() and str(p) == value and os.path.normpath(value) == value,
+            "historical path must be absolute and normalized")
+    return p
+
+
+def within(root, value, historical=False):
+    if historical:
+        p = historical_path(value)
+        require(p == root or root in p.parents, "path escapes project root")
+        return p
     p = Path(value).expanduser()
     p = (p if p.is_absolute() else root / p).resolve()
     require(p == root or root in p.parents, "path escapes project root")
@@ -85,7 +98,8 @@ def validate(board):
     keys, requests, scopes = set(), set(), []
     for task in board["tasks"]:
         exact_keys(task, "key title project_root write_scope request_ref native state hold "
-                   "observation verification closure events", "task")
+                   "observation verification closure events" +
+                   (" cancellation" if "cancellation" in task else ""), "task")
         key = task["key"]
         require(isinstance(key, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,63}", key),
                 "task key must be a lowercase slug")
@@ -96,30 +110,38 @@ def validate(board):
         require(task["request_ref"] not in requests, "duplicate request reference")
         requests.add(task["request_ref"])
         require(task["state"] in STATES, "invalid coordination state")
+        terminal = task["state"] in TERMINAL_STATES
         require(nonempty(task["project_root"]), "project root required")
         root = Path(task["project_root"])
-        require(root.is_absolute() and root.resolve() == root, "project root is not canonical")
+        if terminal:
+            historical_path(task["project_root"])
+        else:
+            require(root.is_absolute() and root.resolve() == root, "project root is not canonical")
         require(isinstance(task["write_scope"], list), "write scope must be a list")
         own = []
         for value in task["write_scope"]:
             require(nonempty(value), "write path required")
-            path = within(root, value)
+            path = within(root, value, historical=terminal)
             require(str(path) == value, "write scope changed or is not canonical")
             require(path not in own, "duplicate write scope")
             own.append(path)
-        if task["state"] != "closed":
+        if not terminal:
             for path in own:
                 for other_key, other in scopes:
-                    require(not (path == other or path in other.parents or other in path.parents),
+                    # Conservatively reserve case aliases even on case-sensitive hosts.
+                    folded_path, folded_other = Path(str(path).casefold()), Path(str(other).casefold())
+                    require(other_key == key or not (
+                        folded_path == folded_other or folded_path in folded_other.parents or
+                        folded_other in folded_path.parents),
                             f"write scope conflict: {key} and {other_key}")
                 scopes.append((key, path))
         if task["native"] is not None:
             identity = ref(task["native"])
             require(identity != controller, "controller identity cannot be reused")
-            if task["state"] != "closed":
+            if not terminal:
                 require(identity not in identities, "duplicate active native identity")
                 identities.add(identity)
-        require(task["state"] == "planned" or task["native"] is not None,
+        require(task["state"] in {"planned", "cancelled"} or task["native"] is not None,
                 "bound task identity required")
         if task["hold"] is not None:
             exact_keys(task["hold"], "reason request_ref at", "hold")
@@ -145,7 +167,7 @@ def validate(board):
             for artifact in verification["artifacts"]:
                 exact_keys(artifact, "path sha256", "artifact")
                 require(nonempty(artifact["path"]), "artifact path required")
-                require(str(within(root, artifact["path"])) == artifact["path"],
+                require(str(within(root, artifact["path"], historical=terminal)) == artifact["path"],
                         "artifact path changed")
                 require(isinstance(artifact["sha256"], str) and
                         re.fullmatch(r"[0-9a-f]{64}", artifact["sha256"]), "invalid artifact hash")
@@ -154,7 +176,7 @@ def validate(board):
                     "completed observation required")
         if task["state"] in {"verified", "closed"}:
             require(verification is not None, "verification record required")
-        else:
+        elif task["state"] != "cancelled":
             require(verification is None, "verification attached to unverified state")
         if task["closure"] is not None:
             exact_keys(task["closure"], "evidence at", "closure")
@@ -162,6 +184,25 @@ def validate(board):
             age(task["closure"]["at"])
         require((task["state"] == "closed") == (task["closure"] is not None),
                 "closure/state mismatch")
+        require((task["state"] == "cancelled") == ("cancellation" in task),
+                "cancellation/state mismatch")
+        if task["state"] == "cancelled":
+            cancellation = task["cancellation"]
+            exact_keys(cancellation, "request_ref evidence outcome at", "cancellation")
+            require(nonempty(cancellation["request_ref"]) and nonempty(cancellation["evidence"]),
+                    "explicit cancellation request and reconciliation evidence required")
+            require(cancellation["request_ref"] != task["request_ref"] and
+                    (task["hold"] is None or
+                     cancellation["request_ref"] != task["hold"]["request_ref"]),
+                    "cancellation requires its own user request")
+            age(cancellation["at"])
+            if task["native"] is None:
+                require(cancellation["outcome"] == "not_created" and observation is None and
+                        verification is None, "unbound cancellation requires confirmed non-creation")
+            else:
+                require(cancellation["outcome"] == "stopped" and observation is not None and
+                        observation["state"] in {"failed", "completed"},
+                        "bound cancellation requires confirmed terminal execution")
         require(isinstance(task["events"], list) and task["events"], "events required")
         for event in task["events"]:
             exact_keys(event, "action evidence at", "event")
@@ -238,7 +279,25 @@ def mutate(board, args):
     matches = [t for t in board["tasks"] if t["key"] == args.key]
     require(len(matches) == 1, "unknown task key")
     task = matches[0]
-    require(task["state"] != "closed", "closed task is immutable; use a new request key")
+    require(task["state"] not in TERMINAL_STATES,
+            "terminal task is immutable; use a new request key")
+    if command == "cancel":
+        require(nonempty(args.request_ref) and nonempty(args.evidence),
+                "explicit cancellation request and reconciliation evidence required")
+        if task["native"] is None:
+            require(args.outcome == "not_created", "confirm non-creation before cancelling")
+        else:
+            observation = task["observation"]
+            require(args.outcome == "stopped" and observation is not None and
+                    observation["state"] in {"failed", "completed"},
+                    "confirm stopped execution with a terminal observation before cancelling")
+            require(age(observation["at"]) <= FRESH_SECONDS,
+                    "observation is stale; exact-read again")
+        task["cancellation"] = {"request_ref": args.request_ref, "evidence": args.evidence,
+                                "outcome": args.outcome, "at": now()}
+        task["state"] = "cancelled"
+        event(task, command, args.evidence)
+        return
     if command == "hold":
         require(task["hold"] is None, "task is already held")
         task["hold"] = {"reason": args.reason, "request_ref": args.request_ref, "at": now()}
@@ -257,12 +316,14 @@ def mutate(board, args):
         task["verification"] = None
         event(task, command, args.evidence)
         return
-    require(task["hold"] is None, "task is held; only observe or explicit resume is allowed")
     if command == "bind":
         require(task["native"] is None, "task already bound; never redispatch automatically")
         task["native"] = {"task_id": args.task_id, "host": args.host}
         task["state"] = "active"
-    elif command == "verify":
+        event(task, command, args.evidence)
+        return
+    require(task["hold"] is None, "task is held; verification and closure are prohibited")
+    if command == "verify":
         require(task["state"] == "worker_complete", "fresh completed observation required")
         require(age(task["observation"]["at"]) <= FRESH_SECONDS, "observation is stale; exact-read again")
         root = Path(task["project_root"])
@@ -321,7 +382,7 @@ def parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--version", action="version", version=VERSION)
     sub = p.add_subparsers(dest="command", required=True)
-    for name in ("init", "register", "bind", "observe", "hold", "resume", "verify", "close", "status", "check"):
+    for name in ("init", "register", "bind", "observe", "hold", "resume", "cancel", "verify", "close", "status", "check"):
         command = sub.add_parser(name)
         command.add_argument("board", help="private JSON board path (keep outside the public package)")
         if name not in {"init", "register", "status", "check"}:
@@ -337,12 +398,15 @@ def parser():
             command.add_argument("--title", required=True)
             command.add_argument("--project-root", required=True)
             command.add_argument("--write", action="append", default=[])
-        if name in {"register", "hold", "resume"}:
+        if name in {"register", "hold", "resume", "cancel"}:
             command.add_argument("--request-ref", required=True)
         if name == "bind":
             command.add_argument("--task-id", required=True)
-        if name in {"bind", "observe", "verify", "close"}:
+        if name in {"bind", "observe", "verify", "close", "cancel"}:
             command.add_argument("--evidence", required=True)
+        if name == "cancel":
+            command.add_argument("--outcome", choices=("not_created", "stopped"), required=True,
+                                 help="controller-confirmed non-creation or stopped execution; not a stop command")
         if name == "observe":
             command.add_argument("--state", choices=sorted(NATIVE_STATES), required=True)
         if name == "hold":

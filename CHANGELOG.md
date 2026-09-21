@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1 — Public preview · 2026-09-21
+
+- Keep closed/cancelled records immutable without re-resolving historical paths against the current filesystem.
+- Reconcile an already-created native identity while preserving its hold.
+- Add explicit, evidence-bearing cancellation for confirmed non-creation or ended execution; unknown and running tasks retain their reservations.
+- Specify stable subrequest references for multiple tasks from one message.
+- Accept one owner's redundant parent/child write scopes; conservatively reject case aliases across owners.
+- Add regression coverage for recovery, cancellation, historical paths and scope handling.
+
 ## 0.1.0 — Public preview · 2026-09-21
 
 First public source preview under MIT. The four-job macOS/Linux and Python 3.10/3.13 CI matrix passed. No release tag or GitHub Release has been created; live Voice acceptance remains separate.

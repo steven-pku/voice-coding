@@ -4,7 +4,7 @@
 
 Use Codex's existing Voice feature to coordinate several coding tasks from one controller task. Tell the controller what to start, ask what has changed, and review the results before closing the work.
 
-**v0.1.0 public preview.** It packages a workflow and a small local ledger; Codex provides Voice and the task tools. [Offline CI](https://github.com/steven-pku/voice-coding/actions/workflows/check.yml) covers Python 3.10 and 3.13 on macOS and Linux. See [validation evidence and limits](VALIDATION.md) before relying on live Voice behavior.
+**v0.1.1 public preview.** It packages a workflow and a small local ledger; Codex provides Voice and the task tools. [Offline CI](https://github.com/steven-pku/voice-coding/actions/workflows/check.yml) covers Python 3.10 and 3.13 on macOS and Linux. See [validation evidence and limits](VALIDATION.md) before relying on live Voice behavior.
 
 ## Start here
 
@@ -57,7 +57,7 @@ Replace `my-controller` and `local` with the exact task ID and host from your en
 - Voice input never enlarges permissions. This workflow asks for explicit text authorization for publishing, spending, credential changes, or destructive actions; a broad goal does not grant it.
 - A reported task completion is an observation. The controller reviews artifacts and records verification separately, then closes the task after resolving outstanding items.
 - A ledger hold prevents further dispatch in this workflow. It does **not** terminate a native task or process. If the available tools cannot stop it, the controller reports that limitation and directs you to the native UI.
-- Write scopes are paths on the machine running the helper. They are compared conservatively across all records, regardless of a task's host ID; remote filesystem scopes are not modeled. This is not a sandbox or a lock on other applications. Held tasks retain their write scopes.
+- Write scopes are paths on the machine running the helper. They are compared conservatively across all records, regardless of a task's host ID; remote filesystem scopes are not modeled. This is not a sandbox or a lock on other applications. Held tasks retain their write scopes. Explicitly cancelled tasks release their local reservation only after confirmed non-creation or ended execution; the helper never stops a native process. Case-only path aliases are conservatively treated as overlapping.
 - Native tools vary by environment. There is no promised cross-runtime control layer, background daemon, or automatic task resumption. See [native tool mapping](references/native-tools.md).
 
 [Security](SECURITY.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [MIT license](LICENSE)

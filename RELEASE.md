@@ -1,6 +1,6 @@
 # Public preview and release process
 
-The v0.1.0 public preview is available at [steven-pku/voice-coding](https://github.com/steven-pku/voice-coding). The initial public commit is `6e85c0d551edb77d14e9b2d06ef5ac20bc1d0434`; [its four CI jobs passed](https://github.com/steven-pku/voice-coding/actions/runs/35609717910). No release tag or GitHub Release has been created. Do not push private development history.
+The public preview is available at [steven-pku/voice-coding](https://github.com/steven-pku/voice-coding). The initial public commit is `6e85c0d551edb77d14e9b2d06ef5ac20bc1d0434`; [its four CI jobs passed](https://github.com/steven-pku/voice-coding/actions/runs/35609717910). No release tag or GitHub Release has been created. Do not push private development history.
 
 ## Preparing subsequent updates
 

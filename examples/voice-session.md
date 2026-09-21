@@ -12,7 +12,7 @@ Run `python3 scripts/demo.py` from the repository root for the separate local le
 
 1. Read the current project instructions and state. Confirm the two reviews can proceed independently.
 2. Use the native project tools to identify the target project and host.
-3. Register two request keys, such as `docs-review` and `tests-review`, with the user's request reference and empty write scopes.
+3. Register two request keys, such as `docs-review` and `tests-review`, with stable subrequest references `synthetic-message#docs` and `synthetic-message#tests` derived from the same user message, and empty write scopes. These suffixes are local selectors, not native IDs; retain each exact reference when reconciling or retrying that subrequest.
 4. Create the two explicitly requested native tasks. Bind each ready task ID and host from the actual tool response; do not derive IDs from titles.
 5. Use bounded native waits and inspect returned results before reporting.
 
@@ -49,6 +49,14 @@ Do not archive the task or end Voice as a substitute for stopping it.
 **User:** Resume the test review within its original read-only scope.
 
 **Controller actions:** Record the explicit resume request, refresh native state, and decide whether a follow-up is needed. Do not restart a task that already finished, or resend work with an uncertain delivery outcome.
+
+## Cancel only after reconciliation
+
+**User:** Cancel the documentation request; I no longer need it.
+
+If creation was never sent, record the explicit cancellation and the evidence of non-creation with `cancel --outcome not_created`. If creation is uncertain, keep the reservation and reconcile first. If its exact native identity becomes known while held, `bind` it without resuming, then observe its actual state.
+
+For an existing task, first confirm that execution has ended and record a fresh terminal observation. Only then use `cancel --outcome stopped` with the cancellation request and nonexecution evidence. The cancelled record stays in history and releases its local reservation; the command does not stop a process or approve new work.
 
 ## Check results, then close
 

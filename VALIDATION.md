@@ -1,6 +1,6 @@
 # Validation
 
-Version: **0.1.0**. Status: **public preview**.
+Version: **0.1.1**. Status: **public preview**.
 
 The reproducible entry point is `python3 scripts/check.py`. It runs offline tests, a synthetic two-task CLI demonstration, public-file inventory checks, local Markdown link checks and heuristic private-data scans. All fixtures are synthetic. It does not invoke a model, provider or native task.
 
@@ -28,6 +28,20 @@ The first sandboxed discovery attempt failed on a host startup write. The same i
 ## First public CI · 2026-09-21
 
 [GitHub Actions run 35609717910](https://github.com/steven-pku/voice-coding/actions/runs/35609717910) passed all four jobs (macOS/Linux × Python 3.10/3.13) at public commit `6e85c0d551edb77d14e9b2d06ef5ac20bc1d0434`. Each job ran the 46-test suite, synthetic demo, package checks and whitespace check. Root also reran the 46 tests and demo locally before upload. The earlier 2026-09-07 observations above remain historical evidence.
+
+## Public review corrections · 2026-09-21
+
+GPT 6 Pro statically reviewed 11 public source texts at the first public commit. It reported three P2 coordination defects and two P3 contract/input issues; it did not run code. Root reproduced all five locally and corrected them in 0.1.1:
+
+- Historical terminal paths no longer depend on later filesystem layout; active path checks remain.
+- A held request can bind an already-created identity without resuming.
+- An explicit `cancelled` terminal state records cancellation and confirmed nonexecution while preserving history. Unknown/running work retains its scope.
+- Multi-task requests use stable subrequest references; duplicate subrequests remain rejected.
+- One owner can reserve parent/child paths. Case aliases across owners are conservatively blocked, including on case-sensitive hosts.
+
+The local suite now passes 60 tests. The final public-tree check and remote CI are reported per commit in [GitHub Actions](https://github.com/steven-pku/voice-coding/actions/workflows/check.yml). GPT reviewed the initial code; Root verified the corrections without claiming a second GPT review. The Skill was not globally installed or exercised through live Voice in this review.
+
+Cancelled records use the existing board-v1 envelope with a new terminal state and a required cancellation record. Older helper versions will reject such boards; keep the board with version 0.1.1 or later, and preserve a backup before changing an installed copy.
 
 The helper records controller assertions. Offline success does not prove live Voice behavior, a trusted approval carrier, exactly-once native dispatch, complete task discovery, forced process termination, or user acceptance. Native task tooling and Voice availability depend on the user's current environment.
 
