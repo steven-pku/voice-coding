@@ -1,0 +1,4 @@
+interface:
+  display_name: "Voice Coding"
+  short_description: "Coordinate Codex tasks with native Voice"
+  default_prompt: "Use $voice-coding to coordinate my Codex tasks, preserve holds, and report verified progress."
