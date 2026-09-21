@@ -4,7 +4,7 @@
 
 Use Codex's existing Voice feature to coordinate several coding tasks from one controller task. Tell the controller what to start, ask what has changed, and review the results before closing the work.
 
-**v0.1.0 local candidate.** This repository is prepared for review before its first GitHub push. Remote CI has not run. It packages a workflow and a small local ledger; Codex provides Voice and the task tools.
+**v0.1.0 public preview.** It packages a workflow and a small local ledger; Codex provides Voice and the task tools. [Offline CI](https://github.com/steven-pku/voice-coding/actions/workflows/check.yml) covers Python 3.10 and 3.13 on macOS and Linux. See [validation evidence and limits](VALIDATION.md) before relying on live Voice behavior.
 
 ## Start here
 

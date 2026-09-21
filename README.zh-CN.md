@@ -4,7 +4,7 @@
 
 利用 Codex 现有 Voice 功能，在一个主控任务中管理多个编码任务：说出要做什么，询问进度，检查结果，再结束工作。
 
-**v0.1.0 本地候选版。** 当前准备到首次推送 GitHub 之前，远端 CI 尚未运行。仓库提供操作流程和轻量本地台账；语音与任务能力由 Codex 提供。
+**v0.1.0 公开预览版。** 仓库提供操作流程和轻量本地台账；语音与任务能力由 Codex 提供。[离线 CI](https://github.com/steven-pku/voice-coding/actions/workflows/check.yml)覆盖 macOS、Linux 和 Python 3.10／3.13。实际 Voice 使用前，请阅读[验证记录与限制](VALIDATION.md)。
 
 ## 开始使用
 

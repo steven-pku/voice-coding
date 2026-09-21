@@ -32,4 +32,4 @@ Write scopes use normalized absolute file or directory paths on the machine runn
 
 Report ordinary reproducible bugs with a synthetic board and redacted output. For a suspected boundary bypass or private-data exposure, use the repository's private vulnerability reporting channel if it is enabled. If there is no private channel, open an issue asking for a private contact without including the vulnerability details. Never post credentials, real transcripts, private paths, or another person's data.
 
-This is a local candidate. Review [VALIDATION.md](VALIDATION.md) for the checks actually performed and the limits that remain.
+This is a public preview. Review [VALIDATION.md](VALIDATION.md) for the checks actually performed and the limits that remain.

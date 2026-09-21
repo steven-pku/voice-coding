@@ -1,6 +1,6 @@
 # Validation
 
-Version: **0.1.0**. Status: **local release candidate, not published**.
+Version: **0.1.0**. Status: **public preview**.
 
 The reproducible entry point is `python3 scripts/check.py`. It runs offline tests, a synthetic two-task CLI demonstration, public-file inventory checks, local Markdown link checks and heuristic private-data scans. All fixtures are synthetic. It does not invoke a model, provider or native task.
 
@@ -25,6 +25,10 @@ The first sandboxed discovery attempt failed on a host startup write. The same i
 - A closed record initially prevented a new request from using its existing native owner. Active identities remain unique, closed history remains immutable, and a new request can bind the previous owner after fresh inspection. Four follow-up regressions passed.
 - Installed copies now include the MIT notice. Scope documentation explicitly describes local, conservative path comparison without claiming remote filesystem coordination.
 
-The helper records controller assertions. Offline success does not prove live Voice behavior, a trusted approval carrier, exactly-once native dispatch, complete task discovery, forced process termination, or user acceptance. GitHub CI has not run. Native task tooling and Voice availability depend on the user's current environment.
+## First public CI · 2026-09-21
+
+[GitHub Actions run 35609717910](https://github.com/steven-pku/voice-coding/actions/runs/35609717910) passed all four jobs (macOS/Linux × Python 3.10/3.13) at public commit `6e85c0d551edb77d14e9b2d06ef5ac20bc1d0434`. Each job ran the 46-test suite, synthetic demo, package checks and whitespace check. Root also reran the 46 tests and demo locally before upload. The earlier 2026-09-07 observations above remain historical evidence.
+
+The helper records controller assertions. Offline success does not prove live Voice behavior, a trusted approval carrier, exactly-once native dispatch, complete task discovery, forced process termination, or user acceptance. Native task tooling and Voice availability depend on the user's current environment.
 
 Sources checked for this package: [official Voice documentation](https://learn.chatgpt.com/docs/features/voice), [official skill best practices](https://learn.chatgpt.com/guides/best-practices), and the task tool descriptions available during development. The package adapts the coordination patterns from private practice; no private runtime, state ledger, session history or audio is included.

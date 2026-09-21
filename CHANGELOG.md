@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.1.0 — Unreleased
+## 0.1.0 — Public preview · 2026-09-21
 
-Local candidate prepared for review before the first GitHub push. No published release or remote CI result is claimed.
+First public source preview under MIT. The four-job macOS/Linux and Python 3.10/3.13 CI matrix passed. No release tag or GitHub Release has been created; live Voice acceptance remains separate.
 
 - A project-local Codex Skill for using existing Voice and native task tools from one controller task.
 - Guidance for explicitly requested task creation, fresh status checks, bounded follow-up, holds, and separate controller verification.
